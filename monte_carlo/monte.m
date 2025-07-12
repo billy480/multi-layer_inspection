@@ -1,4 +1,4 @@
-function [E_CperT]=monte(tau,Lp,d1)    
+function [E_CperT]=monte(tau,Lp,Lv)    
 %% monte carlo simulation
     Csum=0;
     Tsum=0;
@@ -9,15 +9,14 @@ function [E_CperT]=monte(tau,Lp,d1)
         %d0=1;% delay time of threshold
         %d1=14; % delay time of velocity
         %d2=1; % delay time of defection
-        d0=d1;
-
+        d0=1;
         d1=d0;
-        d2=d0;
+
         %Lp=100;
-        
+        d2=d1;
         % Para threshold
-        Lf=45;
-        Lv=inf;%0.4*1.5;%0.4*1.8; % velocity maintenance negligeable when 0
+        Lf=40;
+        %Lv=0;%0.4*1.5;%0.4*1.8; % velocity maintenance negligeable when 0
         [C,T]=run(tau,Lf,Lv,Lp,d0,d1,d2); % comlpexity ~O(N) total~O(N*Niter)
         Csum=C+Csum;
         Tsum=T+Tsum;

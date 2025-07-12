@@ -1,21 +1,22 @@
 function [C,T]=run(tau,Lf,Lv,Lp,d0,d1,d2)    
     % complexite O(N)    space~O(time step)
     % Parameter set
-    mu1=0.4; %0.2 0.4 0.8
+    mu1=0.4; %0.2 0.4 0.6 0.8 1.0 
     sigma1=0.3; % 0.1 0.3 0.5
-    mu2=1.3;% 2 2.7 3.4
+    mu2=2.7;% 2.1 2.4 2.7 3.0 3.3
     sigma2=0.5; %0.3 0.5 0.8
     beta=0.15;%0.15
-    alpha=0;
+    alpha=0.15;%0.15
     %Lf=150;
     %Lp=100;
     %Lv=2;
     
     % Operation cost
-    cia=5;% degradation inspection 5 10 15 20 25   无Lv检测时为0
-    cib=15;% defect inspection 5 10 15 20 25
-    cf=5000; %2500 3000 3500 4000 4500 
-    cp=400; %200 250 300 350 400 
+    cia=5;% degradation inspection 2 5 8 11 14   
+    cib=15;% defect inspection 10 15 20 25 30
+    cf=2000; %1500 2000 2500 3000 3500 
+    cp=200; %100 150 200 250 300 ·z
+    cs=40; %20 30 40 50 60
   
     % Parameter no.1
     %tau=7;
@@ -24,13 +25,13 @@ function [C,T]=run(tau,Lf,Lv,Lp,d0,d1,d2)
     
     
     % Creation of defect point
-    Expectation_def=20; %偏移的正态分布
-    sigma_def=5.1;
+    Expectation_def=34; %偏移的正态分布
+    sigma_def=3.1;
     %Z=fix(randn()*sigma_def+Expectation_def);% 生成正态分布型Z
-
     % 设定形状参数 k（Weibull 分布常见形状参数为 2 接近正态分布）
-    k = 2;  
-    lambda = Expectation_def / gamma(1 + 1/k); % 计算对应的尺度参数
+    k = 3.1;  
+    %lambda = Expectation_def / gamma(1 + 1/k); % 计算对应的尺度参数
+    lambda = 34;    %26 30 34 38 42
 
     % 生成一个 Weibull 分布的随机数
     U = rand(); % 生成一个 (0,1) 之间的均匀随机数
@@ -106,61 +107,74 @@ function [C,T]=run(tau,Lf,Lv,Lp,d0,d1,d2)
         if T>=Tf %直接失败的惩罚
             T_max=Tf;
             C=C+cf;
+            %停机惩罚
+            T=T+d2;
+            C=C+d2*cs;
             break 
+        %{
         elseif velocity>Lv 
             if T<Z
                 %disp("false");
             end
-            T_max=T+d1;
+            T_max=T+d2;
             % delay time model (TBM)
             T=T_max;
             if T>=Tf
                 C=C+cf;
             end   
             break
+        %}
         elseif T>Tp
             T_max=T+d0;
             % delay time model (TBM)
             T=T_max;
             if T>=Tf
                 C=C+cf;
+                %停机时间
+                Ts=T-Tf;
+                C=C+Ts*cs;
             end 
             break
         end
+        
 
-        C=C+cib;
-        if T>Z % FN
-            b=rand(); %generate random number between 0 1
-            if b>beta  %defect detected    这种方法有一个缺点在于，velocity没有超过，但是defect已经被检测到了。不过这点被Lp compense了
-                T_max=T+d2;
-                % delay time model (TBM)
-                T=T_max;
-                if T>=Tf
-                    C=C+cf;
+        if velocity>Lv
+            C=C+cib;
+            if T>Z % FN
+                b=rand(); %generate random number between 0 1
+                if b>beta  %defect detected    这种方法有一个缺点在于，velocity没有超过，但是defect已经被检测到了。不过这点被Lp compense了
+                    T_max=T+d1;
+                    % delay time model (TBM)
+                    T=T_max;
+                    if T>=Tf
+                        C=C+cf;
+                    end
+                    break
                 end
-                break
-            end
-        else     % FP 双重检验
-            a=rand();
-            if a<alpha && (velocity>Lv || T>20) %FP 速度小于阈值就可判断FP，而速度大于阈值确定进入defect。 velocity 有一个双向作用
-                %但是，velocity前面已经判断过铁不会超过Lv，否则早就停了。这个代码和前面的代码发生条件相同。
-                %是否可以设置在一定时间之前我们遵循这种规则用来排除FP，在一定时间之后遵循另一种规则排除FN
-                %which means， T 在一定范围内，我们只采用阈值，在一定范围之后，我们采用多层检测。
-                %或者完全不用这么搞，保留原来的公式，只添加FP的情况，若
-                %或者直接双阈值，大于高阈值，直接延期，大于低阈值，考虑FP可能性
-                %总结一下，若大于Lvh，确定FN；若小于Lvl,确定FP；若在二者中间，需要TypeB检查
-                %难点，number of inspection?
-                %两个选择，要么控制TYPE B inpection延迟T进行，要么整个高低阈值---》用来解决FP占大头的问题
-                T_max=T+d2;
-                % delay time model (TBM) 
-                T=T_max;
-                if T>=Tf
-                    C=C+cf;
+            else     % FP 双重检验
+                a=rand();
+                if a<alpha && (velocity>Lv) %|| T>20) %FP 速度小于阈值就可判断FP，而速度大于阈值确定进入defect。 velocity 有一个双向作用
+                    %但是，velocity前面已经判断过铁不会超过Lv，否则早就停了。这个代码和前面的代码发生条件相同。
+                    %是否可以设置在一定时间之前我们遵循这种规则用来排除FP，在一定时间之后遵循另一种规则排除FN
+                    %which means， T 在一定范围内，我们只采用阈值，在一定范围之后，我们采用多层检测。
+                    %或者完全不用这么搞，保留原来的公式，只添加FP的情况，若
+                    %或者直接双阈值，大于高阈值，直接延期，大于低阈值，考虑FP可能性
+                    %总结一下，若大于Lvh，确定FN；若小于Lvl,确定FP；若在二者中间，需要TypeB检查
+                    %难点，number of inspection?
+                    %两个选择，要么控制TYPE B inpection延迟T进行，要么整个高低阈值---》用来解决FP占大头的问题
+                    T_max=T+d1;
+                    % delay time model (TBM) 
+                    T=T_max;
+                    if T>=Tf
+                        C=C+cf;
+                        %停机时间
+                        Ts=T-Tf;
+                        C=C+Ts*cs;
+                    end
+                    break
                 end
-                break
             end
         end
-
     end
     C=C+cp; %return 
     
